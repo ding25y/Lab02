@@ -6,7 +6,16 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+### Load Packages
 
+The following R code loads packages needed in this assignment.
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(GGally)
+```
 ## R Markdown
 
 This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
@@ -14,7 +23,17 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
-summary(cars)
+drivers <- read_csv("data/bad-drivers.csv")
+names(drivers)[2] <-"DriverNum"
+names(drivers)[3] <-"Speeding"
+names(drivers)[4] <-"Alcohol"
+names(drivers)[5] <-"Distraction"
+names(drivers)[6] <-"History"
+names(drivers)[7] <-"CIP"
+names(drivers)[8] <-"Loss"
+
+names(drivers)
+
 ```
 
 ## Including Plots
@@ -22,7 +41,13 @@ summary(cars)
 You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
-plot(pressure)
+summary(drivers)
+dim(drivers)
+head(drivers)
+vars_to_use <- c("DriverNum" ,"Speeding","Alcohol","Distraction","History","Loss" ,"CIP")
+ggpairs(drivers%>%select(vars_to_use))
+ggplot(data = drivers, mapping = aes(x = "State", y = "CIP" )) +
+  geom_col()
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

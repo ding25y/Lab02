@@ -15,6 +15,7 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 library(GGally)
+library(caret)
 ```
 ## R Markdown
 
@@ -46,8 +47,91 @@ dim(drivers)
 head(drivers)
 vars_to_use <- c("DriverNum" ,"Speeding","Alcohol","Distraction","History","Loss" ,"CIP")
 ggpairs(drivers%>%select(vars_to_use))
-ggplot(data = drivers, mapping = aes(x = "State", y = "CIP" )) +
-  geom_col()
+```
+```{r}
+reg01 <- lm(CIP~Loss, data = drivers)
+summary(reg01)
+confint(reg01,level = 0.95)
+reg02 <-lm(CIP~(Loss+Alcohol), data = drivers)
+summary(reg02)
+confint(reg02,level = 0.95)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+set.seed(67)
+train_val_inds <- caret::createDataPartition(
+  y = drivers$CIP,
+  p = 0.8
+)
+train_val_inds
+driver_train_val <- drivers %>% slice(train_val_inds[[1]])
+driver_test <- drivers %>% slice(-train_val_inds[[1]])
+
+crossval_fold_inds <- caret::createFolds(
+  y = driver_train_val$CIP,
+  k = 5
+)
+
+
+train_val_mse <- expand.grid(
+  reg = seq_len(2),
+  val_fold_num = seq_len(5),
+  train_mse = NA,
+  val_mse = NA
+)
+
+for(reg in seq_len(2)){
+  for (val_fold_num in seq_len(5)){
+    results_index <- which(
+      train_val_mse$reg == reg &
+      train_val_mse$val_fold_num == val_fold_num
+    )
+    driver_train <- driver_train_val %>% slice(-crossval_fold_inds[[val_fold_num]])
+    driver_val <- driver_train_val %>% slice(crossval_fold_inds[[val_fold_num]])
+    if (reg == 1){
+      fit <- lm(CIP~Loss,data = driver_train)
+    }else{
+      fit <- lm(CIP~(Loss+Alcohol),data = driver_train)
+    }
+  
+    train_resids<- driver_train$CIP - predict(fit)
+    train_val_mse$train_mse[results_index] <- mean(train_resids^2)
+  
+    val_resids<- driver_val$CIP - predict(fit , driver_val)
+    train_val_mse$val_mse[results_index] <- mean(val_resids^2) #mean(val_resids^2)
+  
+  }
+}
+
+train_val_mse
+
+summarized_crossval_mse_results <- train_val_mse %>% 
+  group_by(reg) %>%
+  summarize(
+    crossval_mse = mean(val_mse)
+  )
+summarized_crossval_mse_results
+```
+## Discussion
+
+  Please explain your model, making sure to reference the coefficients of the model.  You should discuss any relevant hypothesis tests or confidence intervals as appropriate.
+  reg01: 
+  coefficeients: predictive: Loss, response:CIP
+  hypothesis: a p-value of 1.043e-06 shows strong rejection 
+  confintL                2.5 %     97.5 %
+(Intercept) 64.937209 505.712968
+Loss         2.861401   6.085265
+
+  reg02: 
+  coefficeients: predictive: Loss, response:CIP+Alcohol
+  hypothesis: a p-value of 7.186e-06 shows strong rejection 
+                 2.5 %     97.5 %
+(Intercept) -97.953427 588.111062
+Loss          2.860841   6.128098
+Alcohol      -6.686590   9.124392
+  
+  How does your multiple regression model compare to the simple linear regression model, and how would you communicate these results to an audience?
+  From the summary output of both models, the simple linear model is better because the second predictive variable in multiple regression model is not significant, although both models are significant. 
+  
+  How does the cross-validation MSE compare between your simple and multiple regression models?  What does this mean?
+  The multiple regression model has better training data performence, but preforms worse in validation data; it also shows the same pattern in average MSE. Based on the limited info provided, a simple linear regression is better.
